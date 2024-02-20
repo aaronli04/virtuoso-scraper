@@ -3,7 +3,6 @@ from bs4 import BeautifulSoup
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-import time
 from helpers import extract_soup_from_response, extract_primary_data, extract_advanced_data
 
 
