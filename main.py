@@ -43,7 +43,7 @@ def scrape_virtuoso():
             break  # Exit the loop if the button is not found
 
     data = {
-        'Name': [], 'Address': [], 'Neighborhood': [], 'Nearest Airport': [],
+        'Name': [], 'Address': [], 'Link': [], 'Neighborhood': [], 'Nearest Airport': [],
         'Size': [], 'Room Style': [], 'Vibe': [], 'Icon Tags': [], 'Description': [], 'Insider Tip': [],
         'Virtuoso Traveler Receives': [], 'At the Hotel': [], 'Reviews': []
     }
@@ -62,12 +62,11 @@ def scrape_virtuoso():
 
         link, name, description, tags = extract_primary_data(hotel)
         link = base_url + link
-        if name == '':
+        if name == '' or link == '':
             continue
         airport, address, neighborhood, size, style, vibe, tip, benefits, amenities, reviews = extract_advanced_data(link)
 
         print(name, link)
-        print(reviews)
     
         data['Name'].append(name)
         data['Address'].append(address)
@@ -81,7 +80,8 @@ def scrape_virtuoso():
         data['Insider Tip'].append(tip)
         data['Virtuoso Traveler Receives'].append(benefits)
         data['At the Hotel'].append(amenities)    
-        data['Reviews'].append(reviews)    
+        data['Reviews'].append(reviews)   
+        data['Link'].append(link) 
 
     df = pd.DataFrame(data)
     df.to_csv('hotel_data.csv', index=False)

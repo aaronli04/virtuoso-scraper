@@ -3,6 +3,9 @@ from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import TimeoutException
 import time
 import json
 
@@ -21,11 +24,24 @@ def extract_soup_with_selenium(link):
     options.add_argument('--headless')
     driver = webdriver.Chrome(options=options)
     driver.get(link)
-    time.sleep(0.1)
-    page_source = driver.page_source
-    soup = BeautifulSoup(page_source, 'html.parser')
-    return soup
 
+    try:
+        # Wait for the reviews element to be present
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, 'tc-reviews'))
+        )
+
+        page_source = driver.page_source
+        soup = BeautifulSoup(page_source, 'html.parser')
+        return soup
+    except TimeoutException:
+        print("Timed out waiting for reviews element.")
+
+        page_source = driver.page_source
+        soup = BeautifulSoup(page_source, 'html.parser')
+        return soup
+    finally:
+        driver.quit()
 
 # Get primary data (name, link, tags, description)
 def extract_primary_data(hotel):
@@ -47,15 +63,20 @@ def extract_primary_data(hotel):
 
 # Get address data
 def get_address_data(script):
-    data = json.loads(script)
-    address_data = data.get('address', {})
-    address = [
-        address_data.get('streetAddress'),
-        address_data.get('addressLocality'),
-        address_data.get('addressRegion'),
-        address_data.get('addressCountry')
-    ]
-    address_str = ', '.join(filter(None, address))
+    address_str = ''
+    try:
+        data = json.loads(script)
+        address_data = data.get('address', {})
+        address = [
+            address_data.get('streetAddress'),
+            address_data.get('addressLocality'),
+            address_data.get('addressRegion'),
+            address_data.get('addressCountry')
+        ]
+        address_str = ', '.join(filter(None, address))
+    except (json.JSONDecodeError, AttributeError, KeyError):
+        print("Error: Unable to fetch address data.")
+    
     return address_str
 
 # Get neighborhood data
@@ -137,19 +158,28 @@ def get_reviews(element):
     reviews = {}
     reviews_list = []
     recommended = False
+    recommended_percentage = ''
+    total_reviews = ''
 
     if element:
-        recommended_percentage_raw = element.find('h2', class_='text--serif').text
-        recommended_percentage = recommended_percentage_raw.split('%')[0]
-        total_reviews_raw = element.find('h4', class_='mb-3').text
-        total_reviews = total_reviews_raw.split(' ')[0]
+        percentage_raw_element = element.find('h2', class_='text--serif')
+        if percentage_raw_element:
+            recommended_percentage_raw = percentage_raw_element.text
+            recommended_percentage = recommended_percentage_raw.split('%')[0]
+
+        total_reviews_element = element.find('h4', class_='mb-3')
+        if total_reviews_element:
+            total_reviews_raw = total_reviews_element.text
+            total_reviews = total_reviews_raw.split(' ')[0]
 
         for review in element.find_all('li'):
-            recommended_text = review.find('b', class_='text-gray').text.strip()
-            if recommended_text == 'Recommended':
-                recommended = True
-            elif recommended_text == 'Not Recommended':
-                recommended = False
+            recommended_text_element = review.find('b', class_='text-gray')
+            if recommended_text_element:
+                recommended_text = recommended_text_element.text.strip()
+                if recommended_text == 'Recommended':
+                    recommended = True
+                elif recommended_text == 'Not Recommended':
+                    recommended = False
 
             review_date_element = review.find('div', class_='text-right')
             review_date = review_date_element.text.strip() if review_date_element else ''
@@ -175,6 +205,7 @@ def get_reviews(element):
     
             reviews = {
                 'recommended_percentage': recommended_percentage,
+                'total_reviews': total_reviews,
                 'reviews': reviews_list
             }
 
@@ -232,4 +263,4 @@ def extract_advanced_data(link):
         reviews_element = soup.find('li', id='tc-reviews')
         reviews = get_reviews(reviews_element)
 
-        return airport, address, neighborhood, size, style, vibe, tip, benefits, amenities, reviews
+    return airport, address, neighborhood, size, style, vibe, tip, benefits, amenities, reviews
