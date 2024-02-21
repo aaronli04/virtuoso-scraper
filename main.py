@@ -3,8 +3,8 @@ from bs4 import BeautifulSoup
 import pandas as pd
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from helpers import extract_soup_from_response, extract_primary_data, extract_advanced_data
-
+import concurrent.futures
+from helpers import extract_soup_from_response, extract_hotel_data
 
 def scrape_virtuoso():
     # Virtuoso scrape link
@@ -12,6 +12,8 @@ def scrape_virtuoso():
 
     # Virtuoso base link
     base_url = 'https://www.virtuoso.com'
+
+    links = []
 
     # Use requests and Beautiful Soup for initial page load
     response = requests.get(url)
@@ -55,34 +57,15 @@ def scrape_virtuoso():
                 if h2_element:
                     link_element = h2_element.find('a')
                     if link_element and 'href' in link_element.attrs:
-                        link = link_element['href']
+                        links.append(base_url + link_element['href'])
             except Exception as e:
                 continue
-
-        link, name, description, tags = extract_primary_data(hotel)
-        link = base_url + link
-        if name == '' or link == '':
-            continue
-        airport, address, neighborhood, size, style, vibe, tip, benefits, amenities, reviews = extract_advanced_data(link)
-
-        print(name, link)
     
-        data['Name'].append(name)
-        data['Address'].append(address)
-        data['Neighborhood'].append(neighborhood)
-        data['Nearest Airport'].append(airport)
-        data['Size'].append(size)    
-        data['Room Style'].append(style)
-        data['Vibe'].append(vibe)
-        data['Icon Tags'].append(tags)
-        data['Description'].append(description)
-        data['Insider Tip'].append(tip)
-        data['Virtuoso Traveler Receives'].append(benefits)
-        data['At the Hotel'].append(amenities)    
-        data['Reviews'].append(reviews)   
-        data['Link'].append(link) 
+    with concurrent.futures.ThreadPoolExecutor(max_workers=40) as executor:  # Adjust max_workers as needed
+        # Scrape hotel data concurrently
+        results = list(executor.map(extract_hotel_data, links))
 
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(results)
     df.to_csv('hotel_data.csv', index=False)
 
 

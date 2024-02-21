@@ -29,7 +29,6 @@ def extract_soup_with_selenium(link):
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, 'tc-reviews'))
         )
-
         page_source = driver.page_source
         soup = BeautifulSoup(page_source, 'html.parser')
         return soup
@@ -41,24 +40,6 @@ def extract_soup_with_selenium(link):
         return soup
     finally:
         driver.quit()
-
-# Get primary data (name, link, tags, description)
-def extract_primary_data(hotel):
-    link = ''
-    name = ''
-    description = ''
-    tags = ''
-
-    try:
-        link = hotel.find('h2').find('a')['href']
-        name = hotel.find('h2').find('a').text.strip()
-        description = hotel.find('div', class_='mt-2').text.strip()
-        experiences = [li.text.strip() for li in hotel.find('ul', class_='hotel-experiences').find_all('li')]
-        tags = ', '.join(experiences)
-
-        return link, name, description, tags
-    except AttributeError:
-        return link, name, description, tags
 
 # Get address data
 def get_address_data(script):
@@ -210,10 +191,13 @@ def get_reviews(element):
 
     return reviews
 
-# Extract advanced data
-def extract_advanced_data(link):
+# Extract hotel data
+def extract_hotel_data(link):
     soup = extract_soup_with_selenium(link)
 
+    name = ''
+    description = ''
+    tags = ''
     neighborhood = ''
     address = ''
     airport = ''
@@ -232,6 +216,16 @@ def extract_advanced_data(link):
         # Pull neighborhood and airport data
         info_element = soup.find('div', class_='-info')
         if info_element:
+            name_element = info_element.find('h1', class_='mb-3')
+            if name_element:
+                name = name_element.text.strip()
+            
+            tags = [li.text.strip() for li in info_element.find('ul', class_='hotel-experiences').find_all('li')]
+
+            description_element = info_element.find('div', class_='-description mt-3')
+            if description_element:
+                description = description_element.text.strip()
+
             for div in info_element.find_all('div'):
                 text = div.get_text(strip=True)
                 if 'NEAREST AIRPORT' in text:
@@ -262,4 +256,5 @@ def extract_advanced_data(link):
         reviews_element = soup.find('li', id='tc-reviews')
         reviews = get_reviews(reviews_element)
 
-    return airport, address, neighborhood, size, style, vibe, tip, benefits, amenities, reviews
+    result = [name, description, tags, link, airport, address, neighborhood, size, style, vibe, tip, benefits, amenities, reviews]
+    return result
